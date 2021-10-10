@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
  * return: 1 if the circuit outputs 1; 0 otherwise.
  */
 
-#define SIZE 16
+#define SIZE 32
 
 int checkCircuit(int id, int bits)
 {
@@ -94,20 +94,11 @@ int checkCircuit(int id, int bits)
     for (i = 0; i < SIZE; i++)
         v[i] = EXTRACT_BIT(bits, i);
 
-    int pattern = 0b1001111111110111; 
-    int _bits = bits;
-    _bits |= 0x63;
-
-    // if ((v[0] || v[1]) && (!v[9] || !v[10]) && !(pattern ^ _bits))
-   	if (  (v[0] || v[1]) && (!v[1] || !v[3]) && (v[2] || v[3])
-       && (!v[3] || !v[4]) && (v[4] || !v[5])
-       && (v[5] || !v[6]) && (v[5] || v[6])
-       && (v[6] || !v[15]) && (v[7] || !v[8])
-       && (!v[7] || !v[13]) && (v[8] || v[9])
-       && (v[8] || !v[9]) && (!v[9] || !v[10])
-       && (v[9] || v[11]) && (v[10] || v[11])
-       && (v[12] || v[13]) && (v[13] || !v[14])
-       && (v[14] || v[15]) ) 
+    unsigned int pattern = 0xFFFF9FF7; 
+    unsigned int _bits = bits | 0xFFFF0000;
+    _bits |= 0x0603;
+     
+    if((v[0] || v[1]) && (!v[9] || !v[10]) && _bits == pattern)
     {
        printf ("%d) %d => %d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d \n", id, bits, 
           v[15],v[14],v[13],v[12],
