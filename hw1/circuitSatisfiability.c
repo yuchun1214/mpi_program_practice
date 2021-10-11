@@ -18,10 +18,10 @@ int checkCircuit(int, int);
 
 int main(int argc, char *argv[])
 {
-    unsigned int i;         /* loop variable (32 bits) */
-    int id = 0;    /* process id */
-    int count = 0; /* number of solutions */
-    unsigned int MAX = USHRT_MAX; 
+    unsigned long long i; /* loop variable (32 bits) */
+    int id = 0;           /* process id */
+    int count = 0;        /* number of solutions */
+    unsigned int MAX = USHRT_MAX;
     int rank, comm_sz;
 
     MPI_Init(NULL, NULL);
@@ -35,31 +35,39 @@ int main(int argc, char *argv[])
     unsigned int piece = MAX / comm_sz;
     start_idx = rank * piece;
     end_idx = (rank + 1) * piece;
+
+    if (rank == comm_sz - 1) {
+        count += checkCircuit(rank, MAX);
+        end_idx = MAX;
+    }
+
+
     // printf("#%d take [%u, %u)\n", rank, start_idx, end_idx);
-    for(i = start_idx; i < end_idx; ++i){
+    for (i = start_idx; i < end_idx; ++i) {
         count += checkCircuit(rank, i);
     }
 
-    if(rank){
+    if (rank) {
         MPI_Send(&count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-    }else{
-        unsigned int remaining_start_idx = (comm_sz) * piece;
-        // printf("#%d take [%d, %d]\n", rank, remaining_start_idx, USHRT_MAX);
-        for(i = remaining_start_idx; i <= MAX; ++i){
+    } else {
+        unsigned long long remaining_start_idx = (comm_sz) *piece;
+        for (i = remaining_start_idx; i <= MAX; ++i) {
             count += checkCircuit(rank, i);
         }
         int source_count;
-        for(unsigned int source = 1; source < (unsigned int)comm_sz; ++source){
-            MPI_Recv(&source_count, 1, MPI_INT, source, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (unsigned int source = 1; source < (unsigned int) comm_sz;
+             ++source) {
+            MPI_Recv(&source_count, 1, MPI_INT, source, 0, MPI_COMM_WORLD,
+                     MPI_STATUS_IGNORE);
             count += source_count;
         }
     }
 
-    if(rank == 0){
+    if (rank == 0) {
         total_time = MPI_Wtime() - start_time;
         printf("Process %d finished in time %f secs..\n", id, total_time);
-        fflush(stdout);
         printf("\nA total of %d solutions were found.\n\n", count);
+        fflush(stdout);
     }
     MPI_Finalize();
     return 0;
@@ -88,25 +96,28 @@ int main(int argc, char *argv[])
 
 int checkCircuit(int id, int bits)
 {
-    int v[SIZE]; /* Each element is a bit of bits */
-    int i;
+    // int v[SIZE]; /* Each element is a bit of bits */
+    // int i;
 
-    for (i = 0; i < SIZE; i++)
-        v[i] = EXTRACT_BIT(bits, i);
+    // for (i = 0; i < SIZE; i++)
+    //     v[i] = EXTRACT_BIT(bits, i);
+    int v0, v1, v9, v10;
+    v0 = EXTRACT_BIT(bits, 1);
+    v1 = EXTRACT_BIT(bits, 1);
+    v9 = EXTRACT_BIT(bits, 9);
+    v10 = EXTRACT_BIT(bits, 10);
 
-    unsigned int pattern = 0xFFFF9FF7; 
+    unsigned int pattern = 0xFFFF9FF7;
     unsigned int _bits = bits | 0xFFFF0000;
     _bits |= 0x0603;
-     
-    if((v[0] || v[1]) && (!v[9] || !v[10]) && _bits == pattern)
-    {
-       printf ("%d) %d => %d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d \n", id, bits, 
-          v[15],v[14],v[13],v[12],
-          v[11],v[10],v[9],v[8],v[7],v[6],v[5],v[4],v[3],v[2],v[1],v[0]);
-       fflush (stdout);
-       return 1;
-    } else {
-       return 0;
-    }
 
+    if ((EXTRACT_BIT(bits, 0) || EXTRACT_BIT(bits, 1)) &&
+        (!EXTRACT_BIT(bits, 9) || !EXTRACT_BIT(bits, 10)) && _bits == pattern) {
+        // printf ("%d) 10011%d%d1111101%d%d\n", id, bits,
+        //    v10, v9, v1, v0);
+        // fflush (stdout);
+        return 1;
+    } else {
+        return 0;
+    }
 }

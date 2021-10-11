@@ -3,23 +3,26 @@ CFLAGS := -std=c99
 RUNNER := mpirun
 
 N ?= 10
-TARGET ?= circuitSatisfiability
 
-all: $(TARGET)
+all: monte_carlo_method circuitSatisfiability
 
-OBJS = circuitSatisfiability.o
+OBJS = circuitSatisfiability.o monte_carlo_method.o
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ ${OBJS}
+monte_carlo_method: monte_carlo_method.o
+	$(CC) $(CFLAGS) -o $@ $<
+
+circuitSatisfiability: circuitSatisfiability.o
+	$(CC) $(CFLAGS) -o $@ $<
 
 run :
-	$(RUNNER) -n $(N) ./${TARGET}	
+	$(RUNNER) -n $(N) ./${ta}	
 
 clean:
-	-rm $(TARGET)
+	-rm circuitSatisfiability
+	-rm monte_carlo_method
 	-rm *.o
 
 .PHONY: clean
