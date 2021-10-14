@@ -16,6 +16,20 @@
 
 int checkCircuit(int, int);
 
+#define CLEAR_BIT(num, i) ((num) & (-1 ^ (1 << (i))))
+
+/* EXTRACT_BIT is a macro that extracts the ith bit of number n.
+ *
+ * parameters: n, a number;
+ *             i, the position of the bit we want to know.
+ *
+ * return: 1 if 'i'th bit of 'n' is 1; 0 otherwise
+ */
+#define EXTRACT_BIT(n, i) (((n) & (1 << (i))) ? 1 : 0)
+
+#define SET_BIT(num, i) ((num) | (1 << (i)))
+
+
 int main(int argc, char *argv[])
 {
     unsigned long long i; /* loop variable (32 bits) */
@@ -47,20 +61,29 @@ int main(int argc, char *argv[])
         count += checkCircuit(rank, i);
     }
 
-    if (rank) {
-        MPI_Send(&count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-    } else {
-        unsigned long long remaining_start_idx = (comm_sz) *piece;
-        for (i = remaining_start_idx; i <= MAX; ++i) {
-            count += checkCircuit(rank, i);
+    int _rank = rank;
+    short bit_idx = 0;
+    short head_bit = 32 - __builtin_clz(comm_sz);
+    while (bit_idx < head_bit) {
+        if (EXTRACT_BIT(_rank, bit_idx)) {
+            MPI_Send(&count, 1, MPI_INT, CLEAR_BIT(_rank, bit_idx), 0,
+                     MPI_COMM_WORLD);
+            // printf("[%d] Send to [%d], bit_idx = %d\n", rank,
+            //        CLEAR_BIT(rank, bit_idx), bit_idx);
+            // fflush(stdout);
+            break;
+        } else {
+            int other_count = 0;
+            if (SET_BIT(_rank, bit_idx) < comm_sz) {
+                MPI_Recv(&other_count, 1, MPI_INT, SET_BIT(_rank, bit_idx), 0,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                // printf("[%d] Recv from [%d], bit_idx = %d\n", rank,
+                //        SET_BIT(_rank, bit_idx), bit_idx);
+                // fflush(stdout);
+                count += other_count;
+            }
         }
-        int source_count;
-        for (unsigned int source = 1; source < (unsigned int) comm_sz;
-             ++source) {
-            MPI_Recv(&source_count, 1, MPI_INT, source, 0, MPI_COMM_WORLD,
-                     MPI_STATUS_IGNORE);
-            count += source_count;
-        }
+        bit_idx += 1;
     }
 
     if (rank == 0) {
@@ -72,16 +95,6 @@ int main(int argc, char *argv[])
     MPI_Finalize();
     return 0;
 }
-
-/* EXTRACT_BIT is a macro that extracts the ith bit of number n.
- *
- * parameters: n, a number;
- *             i, the position of the bit we want to know.
- *
- * return: 1 if 'i'th bit of 'n' is 1; 0 otherwise
- */
-
-#define EXTRACT_BIT(n, i) ((n & (1 << i)) ? 1 : 0)
 
 
 /* checkCircuit() checks the circuit for a given input.
@@ -113,9 +126,8 @@ int checkCircuit(int id, int bits)
 
     if ((EXTRACT_BIT(bits, 0) || EXTRACT_BIT(bits, 1)) &&
         (!EXTRACT_BIT(bits, 9) || !EXTRACT_BIT(bits, 10)) && _bits == pattern) {
-        // printf ("%d) 10011%d%d1111101%d%d\n", id, bits,
-        //    v10, v9, v1, v0);
-        // fflush (stdout);
+        printf("%d) 10011%d%d1111101%d%d\n", id, v10, v9, v1, v0);
+        fflush(stdout);
         return 1;
     } else {
         return 0;

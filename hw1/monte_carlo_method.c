@@ -5,6 +5,21 @@
 
 #include <mpi/mpi.h>
 
+#define CLEAR_BIT(num, i) ((num) & (-1 ^ (1 << (i))))
+
+/* EXTRACT_BIT is a macro that extracts the ith bit of number n.
+ *
+ * parameters: n, a number;
+ *             i, the position of the bit we want to know.
+ *
+ * return: 1 if 'i'th bit of 'n' is 1; 0 otherwise
+ */
+#define EXTRACT_BIT(n, i) (((n) & (1 << (i))) ? 1 : 0)
+
+#define SET_BIT(num, i) ((num) | (1 << (i)))
+
+
+
 static double _random_denominator = RAND_MAX >> 1;
 
 static inline double _random()
@@ -70,17 +85,34 @@ int main()
     }
     total_number_in_circle = monte_carlo_method(start_idx, end_idx);
 
-    // send or recv the data
-    if (rank) {
-        MPI_Send(&total_number_in_circle, 1, MPI_UNSIGNED_LONG_LONG, 0, 0,
-                 MPI_COMM_WORLD);
-    } else {
-        unsigned long long count;
-        for (int i = 1; i < comm_sz; ++i) {
-            MPI_Recv(&count, 1, MPI_UNSIGNED_LONG_LONG, i, 0, MPI_COMM_WORLD,
-                     MPI_STATUS_IGNORE);
-            total_number_in_circle += count;
+    int _rank = rank;
+    short bit_idx = 0;
+    short head_bit = 32 - __builtin_clz(comm_sz);
+
+    while (bit_idx < head_bit) {
+        if (EXTRACT_BIT(_rank, bit_idx)) {
+            MPI_Send(&total_number_in_circle, 1, MPI_UNSIGNED_LONG_LONG,
+                     CLEAR_BIT(_rank, bit_idx), 0, MPI_COMM_WORLD);
+            // printf("[%d] Send to [%d], bit_idx = %d\n", rank,
+            //        CLEAR_BIT(rank, bit_idx), bit_idx);
+            // fflush(stdout);
+            break;
+        } else {
+            unsigned long long other_count = 0;
+            if (SET_BIT(_rank, bit_idx) < comm_sz) {
+                MPI_Recv(&other_count, 1, MPI_UNSIGNED_LONG_LONG,
+                         SET_BIT(_rank, bit_idx), 0, MPI_COMM_WORLD,
+                         MPI_STATUS_IGNORE);
+                // printf("[%d] Recv from [%d], bit_idx = %d\n", rank,
+                //        SET_BIT(_rank, bit_idx), bit_idx);
+                // fflush(stdout);
+                total_number_in_circle += other_count;
+            }
         }
+        bit_idx += 1;
+    }
+
+    if (rank == 0) {
         double pi_estimate =
             4 * total_number_in_circle / (double) number_of_tosses;
         total_time = MPI_Wtime() - start_time;
@@ -88,6 +120,7 @@ int main()
         printf("pi_estimate = %f\n", pi_estimate);
         fflush(stdout);
     }
+
     MPI_Finalize();
     return 0;
 }
