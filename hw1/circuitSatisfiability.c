@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     unsigned long long i; /* loop variable (32 bits) */
     int id = 0;           /* process id */
     int count = 0;        /* number of solutions */
-    unsigned int MAX = USHRT_MAX;
+    unsigned int MAX = UINT_MAX;
     int rank, comm_sz;
 
     MPI_Init(NULL, NULL);
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     }
 
     // Send or receive the data
-    // I use tree structure to collect the data for each process
+    // Use tree structure to collect the data for each process
     int _rank = rank;
     short bit_idx = 0;
     short head_bit = 32 - __builtin_clz(comm_sz);  // floor(log2(comm_sz)) + 1
@@ -135,7 +135,7 @@ int checkCircuit(int id, int bits)
     // for (i = 0; i < SIZE; i++)
     //     v[i] = EXTRACT_BIT(bits, i);
     int v0, v1, v9, v10;
-    v0 = EXTRACT_BIT(bits, 1);
+    v0 = EXTRACT_BIT(bits, 0);
     v1 = EXTRACT_BIT(bits, 1);
     v9 = EXTRACT_BIT(bits, 9);
     v10 = EXTRACT_BIT(bits, 10);
