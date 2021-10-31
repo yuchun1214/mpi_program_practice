@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <mpi/mpi.h>
 #include <pthread.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <cstdio>
 #include <cstdlib>
@@ -10,7 +11,6 @@
 #include <iterator>
 #include <limits>
 #include <string>
-#include <stddef.h>
 #include "bmp.h"
 
 using namespace std;
@@ -45,36 +45,33 @@ RGBTRIPLE **alloc_memory(int Y, int X);  // allocate memory
 
 MPI_Datatype rgb_mpi_data_type;
 
-typedef struct task_t{
+typedef struct task_t {
     int cnt;
     int disp;
     int height;
     int width;
-}task_t;
+} task_t;
 
-#define TEST
+// #define TEST
 
-void initialize_rgb_mpi_data_type(){
+void initialize_rgb_mpi_data_type()
+{
     int block_length[3] = {1, 1, 1};
-    MPI_Datatype types[3] = { MPI_UNSIGNED_CHAR, MPI_UNSIGNED_CHAR, MPI_UNSIGNED_CHAR};
-    MPI_Aint offsets[3] = { offsetof(RGBTRIPLE, rgbBlue), offsetof(RGBTRIPLE, rgbGreen), offsetof(RGBTRIPLE, rgbRed)};
+    MPI_Datatype types[3] = {MPI_UNSIGNED_CHAR, MPI_UNSIGNED_CHAR,
+                             MPI_UNSIGNED_CHAR};
+    MPI_Aint offsets[3] = {offsetof(RGBTRIPLE, rgbBlue),
+                           offsetof(RGBTRIPLE, rgbGreen),
+                           offsetof(RGBTRIPLE, rgbRed)};
 
     MPI_Type_create_struct(3, block_length, offsets, types, &rgb_mpi_data_type);
-    MPI_Type_commit(&rgb_mpi_data_type); 
+    MPI_Type_commit(&rgb_mpi_data_type);
 }
 
-
-void print_content(RGBTRIPLE *content, int y){
-    int idx = y*bmpInfo.biWidth;
-    for(int i=idx, size=idx+5; i<size; ++i){
-        printf("(%u %u %u) ", content[i].rgbBlue, content[i].rgbGreen, content[i].rgbRed);
-    }
-}
-
-void scattering_parameters(task_t *tasks, task_t *task, int comm_sz){
-    int *send_cnt = (int *)malloc(sizeof(int)*comm_sz);
-    int *disp = (int *)malloc(sizeof(int)*comm_sz);
-    for(int i = 0; i < comm_sz; ++i){
+void scattering_parameters(task_t *tasks, task_t *task, int comm_sz)
+{
+    int *send_cnt = (int *) malloc(sizeof(int) * comm_sz);
+    int *disp = (int *) malloc(sizeof(int) * comm_sz);
+    for (int i = 0; i < comm_sz; ++i) {
         send_cnt[i] = 1;
         disp[i] = i;
     }
@@ -82,20 +79,27 @@ void scattering_parameters(task_t *tasks, task_t *task, int comm_sz){
 
     MPI_Datatype type;
     int block_length[4] = {1, 1, 1, 1};
-    MPI_Datatype types[4] = { MPI_INT,MPI_INT,MPI_INT,MPI_INT} ;
-    MPI_Aint offsets[4] = { offsetof(task_t, cnt), offsetof(task_t, disp), offsetof(task_t, height), offsetof(task_t, width) };
-    
+    MPI_Datatype types[4] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT};
+    MPI_Aint offsets[4] = {offsetof(task_t, cnt), offsetof(task_t, disp),
+                           offsetof(task_t, height), offsetof(task_t, width)};
+
     MPI_Type_create_struct(4, block_length, offsets, types, &type);
     MPI_Type_commit(&type);
 
     MPI_Scatterv(tasks, send_cnt, disp, type, task, 1, type, 0, MPI_COMM_WORLD);
-
 }
 
 
-void assignment(int rank, int comm_sz, char infileName[], task_t *task, RGBTRIPLE *** triples, int **_send_cnt, int **_disp){
-    RGBTRIPLE * content = NULL;
-    if(rank == 0){
+void assignment(int rank,
+                int comm_sz,
+                char infileName[],
+                task_t *task,
+                RGBTRIPLE ***triples,
+                int **_send_cnt,
+                int **_disp)
+{
+    RGBTRIPLE *content = NULL;
+    if (rank == 0) {
         // read file
         if (readBMP(infileName))
             cout << "Read file successfully!!" << endl;
@@ -104,116 +108,83 @@ void assignment(int rank, int comm_sz, char infileName[], task_t *task, RGBTRIPL
         content = BMPSaveData[0];
     }
 
-    MPI_Barrier(MPI_COMM_WORLD); 
-    
-    int *send_cnt = NULL, *disp=NULL, *height;
-    task_t * tasks = NULL;
-    if(rank == 0){
-        send_cnt = (int*)malloc(sizeof(int)*comm_sz);
-        disp = (int*)malloc(sizeof(int)*comm_sz);
-        height = (int*)malloc(sizeof(int)*comm_sz);
+    int *send_cnt = NULL, *disp = NULL, *height;
+    task_t *tasks = NULL;
+    if (rank == 0) {
+        send_cnt = (int *) malloc(sizeof(int) * comm_sz);
+        disp = (int *) malloc(sizeof(int) * comm_sz);
+        height = (int *) malloc(sizeof(int) * comm_sz);
 
-        memset(send_cnt, 0, sizeof(int)*comm_sz);
-        memset(disp, 0, sizeof(int)*comm_sz);
-        memset(height, 0, sizeof(int)*comm_sz);
+        memset(send_cnt, 0, sizeof(int) * comm_sz);
+        memset(disp, 0, sizeof(int) * comm_sz);
+        memset(height, 0, sizeof(int) * comm_sz);
 
-        for(int i=0, lines=bmpInfo.biHeight/comm_sz; i < comm_sz; ++i){
+        for (int i = 0, lines = bmpInfo.biHeight / comm_sz; i < comm_sz; ++i) {
             height[i] = lines;
         }
 
         // distribute the remainder
         int remainder = bmpInfo.biHeight % comm_sz;
-        for(int i = 0; i < comm_sz&&remainder > 0; ++i){
+        for (int i = 0; i < comm_sz && remainder > 0; ++i) {
             height[i]++;
-            remainder --; 
+            remainder--;
         }
 
-        for(int i = 0; i < comm_sz; ++i)
-            send_cnt[i] = height[i]*bmpInfo.biWidth; 
-    
+        for (int i = 0; i < comm_sz; ++i)
+            send_cnt[i] = height[i] * bmpInfo.biWidth;
+
         disp[0] = 0;
-        for(int i = 1; i < comm_sz; ++i){
-            disp[i] = disp[i-1] + send_cnt[i-1]; 
+        for (int i = 1; i < comm_sz; ++i) {
+            disp[i] = disp[i - 1] + send_cnt[i - 1];
         }
 #ifdef TEST
         printf("Test all lines are distributed.......................");
         int sum = 0;
-        for(int i = 0; i < comm_sz; ++i){
-            sum += height[i]; 
+        for (int i = 0; i < comm_sz; ++i) {
+            sum += height[i];
         }
         assert(sum == bmpInfo.biHeight);
         printf("Pass!\n");
         printf("Test all elements are distributed....................");
         sum = 0;
-        for(int i =0 ; i < comm_sz; ++i){
+        for (int i = 0; i < comm_sz; ++i) {
             sum += send_cnt[i];
         }
-        assert(sum == bmpInfo.biHeight*bmpInfo.biWidth);
+        assert(sum == bmpInfo.biHeight * bmpInfo.biWidth);
         printf("Pass!\n");
 #endif
-        tasks = (task_t*)malloc(sizeof(task_t)*comm_sz);
-        for(int i = 0; i < comm_sz; ++i){
-            tasks[i] = task_t{.cnt = send_cnt[i], .disp = disp[i], .height = height[i], .width = bmpInfo.biWidth};
+        tasks = (task_t *) malloc(sizeof(task_t) * comm_sz);
+        for (int i = 0; i < comm_sz; ++i) {
+            tasks[i].cnt = send_cnt[i];
+            tasks[i].disp = disp[i];
+            tasks[i].height = height[i];
+            tasks[i].width = bmpInfo.biWidth;
+            // tasks[i] = task_t{.cnt = send_cnt[i], .disp = disp[i], .height =
+            // height[i], .width = bmpInfo.biWidth};
         }
     }
 
-    // if(rank == 0){
-    //     printf("cnt : ");
-    //     for(int i=0;i<comm_sz;++i)
-    //         printf("%d ", send_cnt[i]);
-    //     printf("\ndisp : ");
-    //     for(int i=0; i<comm_sz; ++i)
-    //         printf("%d ", disp[i]);
-    //     printf("\n");
-    // } 
-    // MPI_Barrier(MPI_COMM_WORLD);
 
-    scattering_parameters(tasks, task, comm_sz); 
-    // printf("Rank[%d] : \n", rank);
-    // printf("\t cnt : %d", task->cnt);
-    // printf("\t height : %d", task->height);
-    // printf("\t width : %d",task->width);
-    // printf("\t disp : %d\n", task->disp);
+    scattering_parameters(tasks, task, comm_sz);
 
-    RGBTRIPLE ** recv_triples =  NULL;
-    recv_triples = alloc_memory(task->height+2, task->width);
-    // printf("[%d] : %p\n", rank, recv_triples);
-    MPI_Scatterv(content, send_cnt, disp, rgb_mpi_data_type, *(recv_triples+1), (task->height+2)*task->width, rgb_mpi_data_type, 0, MPI_COMM_WORLD);
-    // printf("rank [%d] finishes\n",rank);
-    // fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
+    RGBTRIPLE **recv_triples = NULL;
+    recv_triples = alloc_memory(task->height + 2, task->width);
+    MPI_Scatterv(content, send_cnt, disp, rgb_mpi_data_type,
+                 *(recv_triples + 1), (task->height + 2) * task->width,
+                 rgb_mpi_data_type, 0, MPI_COMM_WORLD);
 
-    // if(rank == 0){
-    //     // print the answer to check if data is copied successfully
-    //     printf("Ans ======\n");
-    //     for(int i=0; i<4;++i){
-    //         printf("Ans %d : ", i);
-    //         print_content(content, i*300);
-    //         printf("\n");
-    //     }
-    //     printf("\n==========\n");
-    // }
-    // MPI_Barrier(MPI_COMM_WORLD);
-    // printf("Rank[%d] got ",rank);
-    // print_content(recv_triples[1], 0);
-    // printf("\n");
     *triples = recv_triples;
-
     *_send_cnt = send_cnt;
     *_disp = disp;
 }
 
-void mutual_exchange(RGBTRIPLE ** edges, RGBTRIPLE **data, int width, int comm_sz, int rank){
+void mutual_exchange(RGBTRIPLE **edges, RGBTRIPLE **data, int width)
+{
     MPI_Barrier(MPI_COMM_WORLD);
-    int send_cnt = 2*width, recv_cnt = 2*width;
-    MPI_Allgather(*data, send_cnt, rgb_mpi_data_type, *edges, recv_cnt, rgb_mpi_data_type, MPI_COMM_WORLD);
+    int send_cnt = 2 * width, recv_cnt = 2 * width;
+    MPI_Allgather(*data, send_cnt, rgb_mpi_data_type, *edges, recv_cnt,
+                  rgb_mpi_data_type, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
-    
-    // for(int i = 0, size = comm_sz<<1; i < size&&rank==0; ++i){
-    //     printf("rank %d\t", i >> 1);
-    //     print_content(edges[i],0);
-    //     printf("\n");
-    // }
 }
 
 int main(int argc, char *argv[])
@@ -229,51 +200,44 @@ int main(int argc, char *argv[])
     char outfileName[] = "output.bmp";
     double startwtime = 0.0, endwtime = 0;
 
-    int comm_sz=4, rank;
-    MPI_Init(&argc,&argv);
+    int comm_sz = 4, rank;
+    MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     initialize_rgb_mpi_data_type();
     //記錄開始時間
-    // startwtime = MPI_Wtime();
+    startwtime = MPI_Wtime();
 
     //動態分配記憶體給暫存空間
     BMPData = alloc_memory(bmpInfo.biHeight, bmpInfo.biWidth);
-    
+
     task_t task;
-    RGBTRIPLE ** segment;
+    RGBTRIPLE **segment;
     int *send_cnt, *disp;
     assignment(rank, comm_sz, infileName, &task, &segment, &send_cnt, &disp);
-    
-    RGBTRIPLE ** all_edges;
+
+    RGBTRIPLE **all_edges;
     all_edges = alloc_memory(comm_sz * 2, task.width);
-    
-    RGBTRIPLE ** edges = alloc_memory(2, task.width);
-    // printf("rank %d\n", rank);
-    // for(int i = 0; i < 2; ++i){
-    //     for(int j = 0; j < 5; ++j){
-    //         printf("\t(%u %u %u) ", edges[i][j].rgbBlue,edges[i][j].rgbGreen, edges[i][j].rgbRed );
-    //     }
-    //     printf("\n");
-    // }
-     
-    BMPData = alloc_memory(task.height+2, task.width);
+
+    RGBTRIPLE **edges = alloc_memory(2, task.width);
+    BMPData = alloc_memory(task.height + 2, task.width);
 
     //進行多次的平滑運算
     for (int count = 0; count < NSmooth; count++) {
-                
         // update edge information
-        memcpy(edges[0], segment[1], sizeof(RGBTRIPLE)*task.width);
-        memcpy(edges[1], segment[task.height], sizeof(RGBTRIPLE)*task.width);
-        mutual_exchange(all_edges, edges, task.width, comm_sz, rank);
+        memcpy(edges[0], segment[1], sizeof(RGBTRIPLE) * task.width);
+        memcpy(edges[1], segment[task.height], sizeof(RGBTRIPLE) * task.width);
+        mutual_exchange(all_edges, edges, task.width);
 
         int upper_idx = rank - 1 < 0 ? comm_sz - 1 : rank - 1;
-        int lower_idx = rank  + 1 >= comm_sz ? 0 : rank + 1;
+        int lower_idx = rank + 1 >= comm_sz ? 0 : rank + 1;
         upper_idx = (upper_idx << 1) + 1;
         lower_idx = (lower_idx << 1);
 
-        memcpy(segment[0], all_edges[upper_idx], sizeof(RGBTRIPLE)*task.width);
-        memcpy(segment[task.height + 1], all_edges[lower_idx], sizeof(RGBTRIPLE)*task.width);
+        memcpy(segment[0], all_edges[upper_idx],
+               sizeof(RGBTRIPLE) * task.width);
+        memcpy(segment[task.height + 1], all_edges[lower_idx],
+               sizeof(RGBTRIPLE) * task.width);
 
         //把像素資料與暫存指標做交換
         swap(BMPData, segment);
@@ -291,8 +255,7 @@ int main(int argc, char *argv[])
                 /*與上下左右像素做平均，並四捨五入                       */
                 /*********************************************************/
                 segment[i][j].rgbBlue =
-                    (double) (BMPData[i][j].rgbBlue + 
-                              BMPData[Top][j].rgbBlue +
+                    (double) (BMPData[i][j].rgbBlue + BMPData[Top][j].rgbBlue +
                               BMPData[Top][Left].rgbBlue +
                               BMPData[Top][Right].rgbBlue +
                               BMPData[Down][j].rgbBlue +
@@ -327,34 +290,24 @@ int main(int argc, char *argv[])
                     0.5;
             }
     }
-    
-    // if(rank == 0){
-    //     for(int i = 0; i < comm_sz; ++i){
-    //         printf("(%d, %d)", send_cnt[i], disp[i]);
-    //     }
-    //     printf("\n");
-    // }
-    // printf("Task.cnt : %d\n", task.cnt);
-    // gether segment[1] - segment[task.height]
-    MPI_Gatherv(segment[1], task.cnt, rgb_mpi_data_type, BMPSaveData == NULL ? NULL : *BMPSaveData, send_cnt, disp, rgb_mpi_data_type, 0, MPI_COMM_WORLD);
+
+    MPI_Gatherv(segment[1], task.cnt, rgb_mpi_data_type,
+                BMPSaveData == NULL ? NULL : *BMPSaveData, send_cnt, disp,
+                rgb_mpi_data_type, 0, MPI_COMM_WORLD);
 
     //寫入檔案
-    if(rank == 0){
+    if (rank == 0) {
         if (saveBMP(outfileName))
             cout << "Save file successfully!!" << endl;
         else
             cout << "Save file fails!!" << endl;
-
     }
-    
-    //得到結束時間，並印出執行時間
-    // endwtime = MPI_Wtime();
-    // cout << "The execution time = "<< endwtime-startwtime <<endl ;
 
-    // free(BMPData[0]);
-    // free(BMPSaveData[0]);
-    // free(BMPData);
-    // free(BMPSaveData);
+    //得到結束時間，並印出執行時間
+    endwtime = MPI_Wtime();
+    if (rank == 0)
+        cout << "The execution time = " << endwtime - startwtime << endl;
+
     MPI_Finalize();
 
     return 0;

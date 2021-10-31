@@ -1,23 +1,29 @@
-CC := mpic++
-CFLAGS := -g
+CC := mpicc
+CXX := mpic++
 RUNNER := mpirun
+CFLAGS := -std=c99 -Wall
 
-all: smooth
+ta ?=
+n ?=
 
-%.o : %.cpp
-	$(CC) -c -o $@ $<
+all : h2_problem1 h2_problem2
 
-test : test.o
-	$(CC) $(CFLAGS) -o test test.o
+h2_problem1 : h2_problem1.cpp bmp.h
+	$(CXX) -O3 -o h2_problem1 h2_problem1.cpp
 
-smooth : Smooth.o bmp.h
-	$(CC) -g -o smooth Smooth.o
+check_sorting_result : check_sorting_result.c
+	$(CC) $(CFLAGS) -O3 -o check check_sorting_result.c
 
-run :
-	$(RUNNER) -n 16 ./smooth
+h2_problem2 : h2_problem2.c check_sorting_result
+	$(CC) $(CFLAGS) -O3 -o h2_problem2 h2_problem2.c 
 
 clean:
 	-rm *.o
-	-rm test
+	-rm h2_problem1 
+	-rm h2_problem2 
+	-rm check
+
+run : 
+	$(RUNNER) -n $(n) ./$(ta)
 
 .PHONY: clean
