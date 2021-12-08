@@ -1,7 +1,7 @@
 CC := mpicc
 CXX := mpic++
 RUNNER := mpirun
-CFLAGS := -std=c99 -Wall
+CFLAGS := -std=c99 -O3 -Wall
 
 ta ?=
 n ?=

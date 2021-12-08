@@ -47,7 +47,7 @@ int compute_partner(int phase, int rank, int comm_sz)
 
 int main(int argc, char *argv[])
 {
-    FILE *fout = freopen("result.txt", "w", stdout);
+    // FILE *fout = freopen("result.txt", "w", stdout);
 
     int comm_sz, rank;
     MPI_Init(&argc, &argv);
@@ -56,9 +56,12 @@ int main(int argc, char *argv[])
 
     if (rank == 0)
         srand(time(NULL));
-
+    
     int n;
     read_input(rank, comm_sz, &n);
+    
+    double startwtime = 0.0, endwtime = 0;
+    startwtime = MPI_Wtime();
     int *arr = (int *) malloc(sizeof(int) * n);
     int *arr2 = (int *) malloc(sizeof(int) * (n));
     int *temp = (int *) malloc(sizeof(int) * n);
@@ -68,23 +71,6 @@ int main(int argc, char *argv[])
 
     qsort(arr, n, sizeof(int), cmp);
 
-    // if(rank == 0){
-    //     printf("Rank 0 : \n");
-    //     for(int i = 0; i < n; ++i){
-    //         printf("\t%d\n", arr[i]);
-    //     }
-    //     fflush(stdout);
-    // }
-    // MPI_Barrier(MPI_COMM_WORLD);
-
-    // if(rank == 1){
-    //     printf("Rank 1 : \n");
-    //     for(int i = 0; i < n; ++i){
-    //         printf("\t%d\n", arr[i]);
-    //     }
-    //     fflush(stdout);
-    // }
-    // MPI_Barrier(MPI_COMM_WORLD);
     for (int phase = 0; phase < comm_sz; ++phase) {
         int partner = compute_partner(phase, rank, comm_sz);
         MPI_Sendrecv(arr, n, MPI_INT, partner, 0, arr2, n, MPI_INT, partner, 0,
@@ -115,35 +101,25 @@ int main(int argc, char *argv[])
             }
         }
 
-        // if(rank == 1){
-        //     printf("Phase %d : \n", phase);
-        //     printf("\ttemp : \n");
-        //     for(int i = 0; i < n; ++i){
-        //         printf("\t%d\n", temp[i]);
-        //     }
-        //     printf("\tarr2 : \n");
-        //     for(int i = 0; i < n; ++i){
-        //         printf("\t%d\n", arr2[i]);
-        //     }
-        //     printf("\tarr : \n");
-        //     for(int i = 0; i < n; ++i){
-        //         printf("\t%d\n", arr[i]);
-        //     }
-        // }
     }
 
+    endwtime = MPI_Wtime();
 
-
+    
     int *main_container = (int *) malloc(sizeof(int) * n * comm_sz);
     MPI_Gather(arr, n, MPI_INT, main_container, n, MPI_INT, 0, MPI_COMM_WORLD);
     if (rank == 0) {
         for (int i = 0, size = n * comm_sz; i < size; ++i) {
             printf("%d\n", main_container[i]);
         }
+        
+        printf("The execution time = %f\n", endwtime - startwtime);
     }
 
 
+
+
     MPI_Finalize();
-    fclose(fout);
+    // fclose(fout);
     return 0;
 }

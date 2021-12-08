@@ -16,7 +16,9 @@
 using namespace std;
 
 //定義平滑運算的次數
-#define NSmooth 1000
+// #define NSmooth 1000
+
+int NSmooth;
 
 /*********************************************************/
 /*變數宣告：                                             */
@@ -92,7 +94,6 @@ void scattering_parameters(task_t *tasks, task_t *task, int comm_sz)
 
 void assignment(int rank,
                 int comm_sz,
-                char infileName[],
                 task_t *task,
                 RGBTRIPLE ***triples,
                 int **_send_cnt,
@@ -100,11 +101,6 @@ void assignment(int rank,
 {
     RGBTRIPLE *content = NULL;
     if (rank == 0) {
-        // read file
-        if (readBMP(infileName))
-            cout << "Read file successfully!!" << endl;
-        else
-            cout << "Read file fails!!" << endl;
         content = BMPSaveData[0];
     }
 
@@ -200,11 +196,23 @@ int main(int argc, char *argv[])
     char outfileName[] = "output.bmp";
     double startwtime = 0.0, endwtime = 0;
 
+    NSmooth = atoi(argv[1]);
+
     int comm_sz = 4, rank;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     initialize_rgb_mpi_data_type();
+
+    if (rank == 0) {
+        // read file
+        // if (readBMP(infileName))
+        //     cout << "Read file successfully!!" << endl;
+        // else
+        //     cout << "Read file fails!!" << endl;
+        readBMP(infileName);
+    }
+
     //記錄開始時間
     startwtime = MPI_Wtime();
 
@@ -214,7 +222,7 @@ int main(int argc, char *argv[])
     task_t task;
     RGBTRIPLE **segment;
     int *send_cnt, *disp;
-    assignment(rank, comm_sz, infileName, &task, &segment, &send_cnt, &disp);
+    assignment(rank, comm_sz, &task, &segment, &send_cnt, &disp);
 
     RGBTRIPLE **all_edges;
     all_edges = alloc_memory(comm_sz * 2, task.width);
@@ -297,16 +305,19 @@ int main(int argc, char *argv[])
 
     //寫入檔案
     if (rank == 0) {
-        if (saveBMP(outfileName))
-            cout << "Save file successfully!!" << endl;
-        else
-            cout << "Save file fails!!" << endl;
+        saveBMP(outfileName);
+        // if (saveBMP(outfileName))
+        //     cout << "Save file successfully!!" << endl;
+        // else
+        //     cout << "Save file fails!!" << endl;
     }
 
     //得到結束時間，並印出執行時間
     endwtime = MPI_Wtime();
-    if (rank == 0)
-        cout << "The execution time = " << endwtime - startwtime << endl;
+    // if (rank == 0)
+    //     cout << "The execution time = " << endwtime - startwtime << endl;
+    if(rank == 0) 
+        printf("%d,%d,%f\n",comm_sz, NSmooth, endwtime - startwtime);
 
     MPI_Finalize();
 
