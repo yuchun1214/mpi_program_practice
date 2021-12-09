@@ -129,12 +129,12 @@ int main(int argc, char *argv[])
         for(int i = 0; i < NUMBER_OF_THREADS; ++i){
             thread_data[i].bmp_data = BMPData;
             thread_data[i].bmp_save_data = BMPSaveData;
-            runner(&thread_data[i]);
-            // pthread_create(&threads[i], NULL, runner, (void*)&thread_data[i]);
+            // runner(&thread_data[i]);
+            pthread_create(&threads[i], NULL, runner, (void*)&thread_data[i]);
         }
-        // for(int i = 0; i < NUMBER_OF_THREADS; ++i){
-        //     pthread_join(threads[i], NULL);
-        // }
+        for(int i = 0; i < NUMBER_OF_THREADS; ++i){
+            pthread_join(threads[i], NULL);
+        }
         
     }
     
