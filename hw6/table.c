@@ -43,3 +43,23 @@ bool table_set_value(int row, int col, table_t *table, double val){
 double table_get_value(int row, int col, table_t *table){
     return table->table[row][col]; 
 }
+
+bool copy_table(table_t *dest, table_t *src){
+    if(!dest || !src){
+#ifdef DEBUG
+        printf("One of parameters is null, return false in the function %s\n", __func__);
+#endif
+        return false;
+    }
+
+    // check if two tables are in the same size
+    if(src->nrow == dest->nrow && src->ncol == dest->ncol){
+        memcpy(dest->table[0], src->table[0], sizeof(double)*src->nrow*src->ncol);
+        return true;
+    }else{
+#ifdef DEBUG
+        printf("Two tables are not in the same size, return false in the function %s\n", __func__);
+#endif
+        return false;
+    }
+}

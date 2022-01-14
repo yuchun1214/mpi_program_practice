@@ -18,6 +18,7 @@ typedef struct __table_t{
 bool create_an_empty_table(int nrow, int ncol, table_t **table);
 bool table_set_value(int row, int col, table_t *table, double val);
 double table_get_value(int row, int col, table_t * table);
+bool copy_table(table_t *src, table_t *dest);
 
 #ifdef __cplusplus
 }

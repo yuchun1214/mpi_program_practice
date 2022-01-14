@@ -3,15 +3,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "table.h"
+#include "common.h"
 
 static int calculate_number_of_cols(char *text){
   	char * pch;
 	int number_of_tokens = 0;
-  	pch = strtok (text," ,.-");
+  	pch = strtok (text," ");
   	while (pch != NULL)
   	{
 	    ++number_of_tokens;
-  	  pch = strtok (NULL, " ,.-");
+  	  pch = strtok (NULL, " ");
   	}  
     return number_of_tokens;
 }
@@ -19,12 +20,12 @@ static int calculate_number_of_cols(char *text){
 static void form_a_row(char *text, double *row){
     char * pch;
 	int number_of_tokens = 0;
-  	pch = strtok (text," ,.-");
+  	pch = strtok (text," ");
   	while (pch != NULL)
   	{
       row[number_of_tokens] = atoi(pch);
 	  ++number_of_tokens;
-  	  pch = strtok (NULL, " ,.-");
+  	  pch = strtok (NULL, " ");
   	}  
 }
 
@@ -51,4 +52,9 @@ bool read_table(const char *filename, table_t **table){
     
     fclose(file);
     return true;
+}
+
+int initial_city(int number_of_cities){
+    double partition = 1.0 / number_of_cities;
+    return rand_double_01() / partition;
 }
